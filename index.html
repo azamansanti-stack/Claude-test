@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>Rooftop Runners</title>
+<link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <div id="game-container">
+    <canvas id="game-canvas"></canvas>
+
+    <!-- HUD shown during gameplay -->
+    <div id="hud" class="hidden">
+      <div id="score">Score: 0</div>
+      <div id="coins">Coins: 0</div>
+      <div id="high-score">Best: 0</div>
+    </div>
+
+    <!-- Character select / start screen -->
+    <div id="menu-screen" class="overlay">
+      <h1>Rooftop Runners</h1>
+      <p class="subtitle">Dash across the rooftops. Dodge, jump, slide, collect.</p>
+
+      <div id="character-select">
+        <button class="char-card" data-char="miles">
+          <canvas class="char-preview" data-preview="miles"></canvas>
+          <span>Miles</span>
+        </button>
+        <button class="char-card" data-char="prowler">
+          <canvas class="char-preview" data-preview="prowler"></canvas>
+          <span>Prowler</span>
+        </button>
+      </div>
+
+      <button id="start-btn">Play</button>
+      <p class="hint">Arrow keys / A-D-W-S to move &middot; swipe on mobile</p>
+    </div>
+
+    <!-- Game over screen -->
+    <div id="game-over-screen" class="overlay hidden">
+      <h1>Busted!</h1>
+      <p id="final-score">Score: 0</p>
+      <p id="final-best">Best: 0</p>
+      <button id="retry-btn">Run Again</button>
+      <button id="menu-btn">Change Character</button>
+    </div>
+
+    <!-- Touch controls (mobile) -->
+    <div id="touch-controls" class="hidden">
+      <button id="touch-left" aria-label="Move left">&#8592;</button>
+      <button id="touch-up" aria-label="Jump">&#8593;</button>
+      <button id="touch-down" aria-label="Slide">&#8595;</button>
+      <button id="touch-right" aria-label="Move right">&#8594;</button>
+    </div>
+  </div>
+
+  <script src="js/game.js"></script>
+</body>
+</html>
