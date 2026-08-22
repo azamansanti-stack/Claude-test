@@ -1,0 +1,815 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Web-Slinger: Prowler Chase</title>
+<style>
+  :root {
+    --brick: #1a0f2e;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    height: 100%;
+    background: #05030a;
+    font-family: 'Segoe UI', Arial, sans-serif;
+    overflow: hidden;
+    touch-action: manipulation;
+    user-select: none;
+  }
+  #wrap {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    width: 100%;
+  }
+  #stage {
+    position: relative;
+    width: 900px;
+    max-width: 100vw;
+    aspect-ratio: 900 / 420;
+  }
+  canvas {
+    width: 100%;
+    height: 100%;
+    display: block;
+    background: linear-gradient(#0d0a2b, #241a3d 60%, #3a2255 100%);
+    border-radius: 8px;
+    box-shadow: 0 0 40px rgba(150, 60, 255, 0.25);
+  }
+  .hud {
+    position: absolute;
+    top: 10px;
+    left: 14px;
+    right: 14px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    color: #fff;
+    font-weight: bold;
+    text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+    pointer-events: none;
+    font-size: clamp(12px, 1.6vw, 16px);
+  }
+  .score-box { text-align: left; }
+  .gap-box { text-align: right; width: 180px; max-width: 40vw; }
+  .bar-track {
+    width: 100%;
+    height: 10px;
+    background: rgba(0,0,0,0.5);
+    border: 1px solid rgba(255,255,255,0.3);
+    border-radius: 5px;
+    overflow: hidden;
+    margin-top: 4px;
+  }
+  #gapFill {
+    height: 100%;
+    width: 100%;
+    background: linear-gradient(90deg, #7CFC9A, #ffd23f, #ff3d3d);
+    transition: width 0.1s linear;
+  }
+  #webFill {
+    height: 100%;
+    width: 100%;
+    background: linear-gradient(90deg, #4fd0ff, #7d5fff);
+    transition: width 0.1s linear;
+  }
+  .web-box { margin-top: 6px; }
+  .overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: rgba(4, 2, 12, 0.82);
+    color: #fff;
+    text-align: center;
+    border-radius: 8px;
+    padding: 20px;
+    gap: 10px;
+  }
+  .overlay h1 {
+    margin: 0;
+    font-size: clamp(22px, 4vw, 40px);
+    color: #ff2e6d;
+    text-shadow: 0 0 12px #ff2e6d99, 0 0 2px #fff;
+    letter-spacing: 1px;
+  }
+  .overlay h2 {
+    margin: 0;
+    font-size: clamp(18px, 3vw, 28px);
+    color: #7d5fff;
+  }
+  .overlay p, .overlay .stats {
+    margin: 2px 0;
+    font-size: clamp(12px, 1.8vw, 15px);
+    max-width: 560px;
+    line-height: 1.5;
+    color: #dcd6f5;
+  }
+  .keys {
+    display: flex;
+    gap: 14px;
+    flex-wrap: wrap;
+    justify-content: center;
+    margin: 6px 0;
+  }
+  .key {
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.25);
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-size: 12px;
+  }
+  .key b { color: #4fd0ff; display: block; font-size: 14px; }
+  button.playBtn {
+    margin-top: 10px;
+    padding: 12px 28px;
+    font-size: 18px;
+    font-weight: bold;
+    color: #05030a;
+    background: linear-gradient(90deg, #ff2e6d, #7d5fff);
+    border: none;
+    border-radius: 30px;
+    cursor: pointer;
+    box-shadow: 0 4px 18px rgba(255,46,109,0.4);
+  }
+  button.playBtn:active { transform: scale(0.97); }
+  .hidden { display: none !important; }
+
+  #touchControls {
+    position: absolute;
+    bottom: 10px;
+    left: 0;
+    right: 0;
+    display: none;
+    justify-content: space-between;
+    padding: 0 12px;
+    pointer-events: none;
+  }
+  #touchControls button {
+    pointer-events: all;
+    width: 68px;
+    height: 68px;
+    border-radius: 50%;
+    border: 2px solid rgba(255,255,255,0.5);
+    background: rgba(20, 10, 40, 0.55);
+    color: #fff;
+    font-size: 11px;
+    font-weight: bold;
+  }
+  #webBtn { background: rgba(79, 208, 255, 0.35); }
+  @media (max-width: 700px), (pointer: coarse) {
+    #touchControls { display: flex; }
+  }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div id="stage">
+    <canvas id="game" width="900" height="420"></canvas>
+
+    <div class="hud">
+      <div class="score-box">
+        SCORE: <span id="score">0</span><br>
+        BEST: <span id="best">0</span>
+      </div>
+      <div class="gap-box">
+        PROWLER GAP
+        <div class="bar-track"><div id="gapFill"></div></div>
+        <div class="web-box">WEB FLUID
+          <div class="bar-track"><div id="webFill"></div></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="startOverlay" class="overlay">
+      <h1>WEB-SLINGER: PROWLER CHASE</h1>
+      <h2>Get out of the neighborhood, Miles!</h2>
+      <p>The Prowler is right behind you. Dodge obstacles to keep your distance &mdash;
+        every hit lets him close in. Get caught and it's game over.</p>
+      <div class="keys">
+        <div class="key"><b>&uarr; / SPACE</b>Jump</div>
+        <div class="key"><b>&darr;</b>Slide</div>
+        <div class="key"><b>X</b>Web-Zip (destroy obstacle)</div>
+      </div>
+      <button class="playBtn" id="startBtn">START RUNNING</button>
+    </div>
+
+    <div id="overOverlay" class="overlay hidden">
+      <h1>CAUGHT!</h1>
+      <p class="stats" id="overStats"></p>
+      <button class="playBtn" id="retryBtn">RUN AGAIN</button>
+    </div>
+
+    <div id="touchControls">
+      <button id="slideBtn">SLIDE<br>&darr;</button>
+      <button id="webBtn">WEB<br>ZIP</button>
+      <button id="jumpBtn">JUMP<br>&uarr;</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  const canvas = document.getElementById('game');
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  const GROUND_Y = H - 70;
+
+  const scoreEl = document.getElementById('score');
+  const bestEl = document.getElementById('best');
+  const gapFillEl = document.getElementById('gapFill');
+  const webFillEl = document.getElementById('webFill');
+  const startOverlay = document.getElementById('startOverlay');
+  const overOverlay = document.getElementById('overOverlay');
+  const overStats = document.getElementById('overStats');
+  const startBtn = document.getElementById('startBtn');
+  const retryBtn = document.getElementById('retryBtn');
+
+  let best = Number(localStorage.getItem('prowlerChaseBest') || 0);
+  bestEl.textContent = best;
+
+  // ---------- World state ----------
+  let state = 'idle'; // idle | running | over
+  let speed = 6.2;
+  let baseSpeed = 6.2;
+  let distance = 0;
+  let score = 0;
+  let elapsed = 0;
+  let gap = 100; // 0 = caught by prowler
+  let webFluid = 100;
+  let invuln = 0;
+  let shakeT = 0;
+  let webBeams = []; // active web-zip visual effects
+  let particles = [];
+
+  const player = {
+    x: 150,
+    y: GROUND_Y,
+    w: 34,
+    h: 58,
+    vy: 0,
+    ducking: false,
+    grounded: true,
+    runT: 0,
+  };
+  const GRAVITY = 0.62;
+  const JUMP_V = -13.6;
+  const DUCK_H = 32;
+
+  let obstacles = [];
+  let nextSpawnDist = 0;
+  let buildings = [];
+  let groundDetails = [];
+
+  function resetWorld() {
+    speed = baseSpeed;
+    distance = 0;
+    score = 0;
+    elapsed = 0;
+    gap = 100;
+    webFluid = 100;
+    invuln = 0;
+    shakeT = 0;
+    webBeams = [];
+    particles = [];
+    obstacles = [];
+    nextSpawnDist = 400;
+    player.y = GROUND_Y;
+    player.vy = 0;
+    player.ducking = false;
+    player.grounded = true;
+    player.runT = 0;
+
+    buildings = [];
+    for (let i = 0; i < 8; i++) {
+      buildings.push({
+        x: i * 160,
+        w: 90 + Math.random() * 70,
+        h: 80 + Math.random() * 140,
+      });
+    }
+    groundDetails = [];
+    for (let i = 0; i < 30; i++) {
+      groundDetails.push({ x: i * 60, w: 30 + Math.random() * 20 });
+    }
+  }
+  resetWorld();
+
+  // ---------- Input ----------
+  const keys = {};
+  function tryJump() {
+    if (state !== 'running') return;
+    if (player.grounded && !player.ducking) {
+      player.vy = JUMP_V;
+      player.grounded = false;
+    }
+  }
+  function setDuck(v) {
+    if (state !== 'running') return;
+    player.ducking = v && player.grounded;
+  }
+  function tryWeb() {
+    if (state !== 'running') return;
+    if (webFluid < 25) return;
+    webFluid -= 25;
+    webBeams.push({ x: player.x + player.w, y: player.y - player.h * 0.6, life: 14 });
+    // destroy the nearest obstacle ahead within web range
+    const range = 260;
+    for (const o of obstacles) {
+      if (!o.dead && o.x > player.x && o.x - player.x < range) {
+        o.dead = true;
+        o.webbed = true;
+        score += 15;
+        for (let i = 0; i < 10; i++) {
+          particles.push({
+            x: o.x + o.w / 2, y: o.y - o.h / 2,
+            vx: (Math.random() - 0.5) * 6, vy: (Math.random() - 0.5) * 6,
+            life: 22, color: '#7d5fff',
+          });
+        }
+        break;
+      }
+    }
+    gap = Math.min(100, gap + 6);
+  }
+
+  window.addEventListener('keydown', (e) => {
+    if (['ArrowUp', 'ArrowDown', 'Space', 'KeyW', 'KeyS', 'KeyX'].includes(e.code)) {
+      e.preventDefault();
+    }
+    if (e.repeat) return;
+    if (e.code === 'ArrowUp' || e.code === 'Space' || e.code === 'KeyW') {
+      if (state === 'idle') startGame();
+      else if (state === 'over') { /* ignore */ }
+      else tryJump();
+    }
+    if (e.code === 'ArrowDown' || e.code === 'KeyS') setDuck(true);
+    if (e.code === 'KeyX') tryWeb();
+  });
+  window.addEventListener('keyup', (e) => {
+    if (e.code === 'ArrowDown' || e.code === 'KeyS') setDuck(false);
+  });
+
+  function bindHold(id, onDown, onUp) {
+    const el = document.getElementById(id);
+    const down = (e) => { e.preventDefault(); onDown(); };
+    const up = (e) => { e.preventDefault(); if (onUp) onUp(); };
+    el.addEventListener('touchstart', down, { passive: false });
+    el.addEventListener('mousedown', down);
+    el.addEventListener('touchend', up, { passive: false });
+    el.addEventListener('mouseup', up);
+    el.addEventListener('mouseleave', up);
+  }
+  bindHold('jumpBtn', tryJump);
+  bindHold('slideBtn', () => setDuck(true), () => setDuck(false));
+  bindHold('webBtn', tryWeb);
+
+  startBtn.addEventListener('click', startGame);
+  retryBtn.addEventListener('click', startGame);
+  canvas.addEventListener('click', () => { if (state === 'idle') startGame(); });
+
+  function startGame() {
+    resetWorld();
+    state = 'running';
+    startOverlay.classList.add('hidden');
+    overOverlay.classList.add('hidden');
+  }
+
+  function endGame() {
+    state = 'over';
+    shakeT = 20;
+    if (score > best) {
+      best = score;
+      localStorage.setItem('prowlerChaseBest', String(best));
+    }
+    bestEl.textContent = best;
+    overStats.innerHTML = `Distance: ${Math.floor(distance)}m &nbsp;|&nbsp; Score: ${score} &nbsp;|&nbsp; Best: ${best}`;
+    overOverlay.classList.remove('hidden');
+  }
+
+  // ---------- Obstacle spawning ----------
+  const TYPES = ['crate', 'spike', 'beam'];
+  function spawnObstacle() {
+    const type = TYPES[Math.floor(Math.random() * TYPES.length)];
+    let o;
+    if (type === 'crate') {
+      o = { type, x: W + 40, w: 36, h: 36, y: GROUND_Y, dead: false };
+    } else if (type === 'spike') {
+      o = { type, x: W + 40, w: 30, h: 26, y: GROUND_Y, dead: false };
+    } else {
+      // overhead beam - must duck under
+      o = { type, x: W + 40, w: 70, h: 22, y: GROUND_Y - 60, dead: false };
+    }
+    obstacles.push(o);
+  }
+
+  // ---------- Update ----------
+  function rectsOverlap(ax, ay, aw, ah, bx, by, bw, bh) {
+    return ax < bx + bw && ax + aw > bx && ay < by + bh && ay + ah > by;
+  }
+
+  function update(dt) {
+    if (state !== 'running') return;
+    elapsed += dt;
+    speed = baseSpeed + Math.min(6, elapsed * 0.045);
+    distance += speed * dt * 0.6;
+    score = Math.floor(distance);
+
+    // gap slowly closes over time (prowler is relentless) - obstacle hits are the real threat
+    gap -= 0.01 * dt;
+    gap = Math.max(0, Math.min(100, gap));
+    webFluid = Math.min(100, webFluid + 0.05 * dt * 6);
+    if (invuln > 0) invuln -= dt;
+
+    // player physics
+    if (!player.grounded) {
+      player.vy += GRAVITY * dt * 6;
+      player.y += player.vy * dt * 6;
+      if (player.y >= GROUND_Y) {
+        player.y = GROUND_Y;
+        player.vy = 0;
+        player.grounded = true;
+      }
+    }
+    player.runT += dt * (player.grounded ? 10 : 0);
+
+    // parallax
+    for (const b of buildings) {
+      b.x -= speed * 0.35 * dt * 6;
+      if (b.x + b.w < 0) b.x += buildings.length * 160;
+    }
+    for (const g of groundDetails) {
+      g.x -= speed * dt * 6;
+      if (g.x + g.w < 0) g.x += groundDetails.length * 60;
+    }
+
+    // spawn
+    if (distance > nextSpawnDist) {
+      spawnObstacle();
+      const gapDist = Math.max(160, 300 - elapsed * 1.5 + Math.random() * 120);
+      nextSpawnDist = distance + gapDist;
+    }
+
+    // obstacles
+    const ph = player.ducking ? DUCK_H : player.h;
+    const py = player.y - ph;
+    const px = player.x + 4;
+    const pw = player.w - 8;
+
+    for (const o of obstacles) {
+      o.x -= speed * dt * 6;
+      if (o.dead) continue;
+      const oy = o.type === 'beam' ? o.y : o.y - o.h;
+      if (rectsOverlap(px, py, pw, ph, o.x, oy, o.w, o.h)) {
+        let hit = true;
+        if (o.type === 'beam' && player.ducking) hit = false;
+        if ((o.type === 'crate' || o.type === 'spike') && !player.grounded) hit = false;
+        if (hit && invuln <= 0) {
+          o.dead = true;
+          gap -= 26;
+          invuln = 1.2;
+          shakeT = 10;
+          for (let i = 0; i < 14; i++) {
+            particles.push({
+              x: player.x + player.w / 2, y: player.y - player.h / 2,
+              vx: (Math.random() - 0.5) * 7, vy: (Math.random() - 1) * 6,
+              life: 26, color: '#ff3d3d',
+            });
+          }
+          if (gap <= 0) { endGame(); }
+        }
+      }
+    }
+    obstacles = obstacles.filter(o => o.x + o.w > -20 && !o.dead || (o.dead && o.x > -50));
+    obstacles = obstacles.filter(o => o.x + 60 > 0);
+
+    for (const wb of webBeams) wb.life -= dt * 6;
+    webBeams = webBeams.filter(wb => wb.life > 0);
+
+    for (const p of particles) {
+      p.x += p.vx; p.y += p.vy; p.vy += 0.25; p.life -= dt * 6;
+    }
+    particles = particles.filter(p => p.life > 0);
+
+    if (shakeT > 0) shakeT -= dt * 6;
+
+    gapFillEl.style.width = gap + '%';
+    webFillEl.style.width = webFluid + '%';
+    scoreEl.textContent = score;
+  }
+
+  // ---------- Draw ----------
+  function drawBackground() {
+    ctx.fillStyle = '#0d0a2b';
+    ctx.fillRect(0, 0, W, GROUND_Y);
+    // moon
+    ctx.fillStyle = '#ffe9b0';
+    ctx.beginPath();
+    ctx.arc(W - 100, 70, 34, 0, Math.PI * 2);
+    ctx.fill();
+
+    for (const b of buildings) {
+      const h = b.h;
+      const grad = ctx.createLinearGradient(0, GROUND_Y - h, 0, GROUND_Y);
+      grad.addColorStop(0, '#241a3d');
+      grad.addColorStop(1, '#3a2255');
+      ctx.fillStyle = grad;
+      ctx.fillRect(b.x, GROUND_Y - h, b.w, h);
+      ctx.fillStyle = 'rgba(255, 210, 100, 0.55)';
+      for (let wx = 8; wx < b.w - 8; wx += 16) {
+        for (let wy = 10; wy < h - 10; wy += 20) {
+          if ((Math.floor(wx + wy + b.x) % 47) < 20) {
+            ctx.fillRect(b.x + wx, GROUND_Y - h + wy, 6, 8);
+          }
+        }
+      }
+    }
+
+    // ground
+    const gGrad = ctx.createLinearGradient(0, GROUND_Y, 0, H);
+    gGrad.addColorStop(0, '#241533');
+    gGrad.addColorStop(1, '#120a1f');
+    ctx.fillStyle = gGrad;
+    ctx.fillRect(0, GROUND_Y, W, H - GROUND_Y);
+    ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(0, GROUND_Y);
+    ctx.lineTo(W, GROUND_Y);
+    ctx.stroke();
+
+    ctx.fillStyle = 'rgba(255,255,255,0.06)';
+    for (const g of groundDetails) {
+      ctx.fillRect(g.x, GROUND_Y + 18, g.w, 4);
+    }
+  }
+
+  function drawMiles(x, groundY, ducking, runT, grounded) {
+    ctx.save();
+    ctx.translate(x, groundY);
+    const bob = grounded ? Math.sin(runT) * 2 : 0;
+    const h = ducking ? DUCK_H : player.h;
+    const bodyTop = -h + bob;
+
+    // legs (animated scissor while running)
+    const legSwing = grounded ? Math.sin(runT) * 10 : 4;
+    ctx.strokeStyle = '#0c0c14';
+    ctx.lineWidth = 7;
+    ctx.lineCap = 'round';
+    if (!ducking) {
+      ctx.beginPath();
+      ctx.moveTo(10, -18 + bob);
+      ctx.lineTo(10 + legSwing * 0.5, 0);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(22, -18 + bob);
+      ctx.lineTo(22 - legSwing * 0.5, 0);
+      ctx.stroke();
+    }
+
+    // torso
+    ctx.fillStyle = '#0c0c14';
+    const tw = 30;
+    ctx.beginPath();
+    ctx.roundRect(0, bodyTop, tw, h * 0.62, 8);
+    ctx.fill();
+
+    // red accent panel
+    ctx.fillStyle = '#e0223a';
+    ctx.beginPath();
+    ctx.roundRect(4, bodyTop + h * 0.08, tw - 8, h * 0.3, 6);
+    ctx.fill();
+
+    // blue web lines accent
+    ctx.strokeStyle = '#2b3fb0';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(2, bodyTop + 4);
+    ctx.lineTo(tw - 2, bodyTop + h * 0.2);
+    ctx.moveTo(tw - 2, bodyTop + 4);
+    ctx.lineTo(2, bodyTop + h * 0.2);
+    ctx.stroke();
+
+    // spider emblem (simple)
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.ellipse(tw / 2, bodyTop + h * 0.22, 5, 3, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // arms
+    ctx.strokeStyle = '#0c0c14';
+    ctx.lineWidth = 6;
+    const armSwing = grounded ? Math.cos(runT) * 12 : -8;
+    ctx.beginPath();
+    ctx.moveTo(2, bodyTop + 8);
+    ctx.lineTo(2 - armSwing * 0.4, bodyTop + 8 + 16);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(tw - 2, bodyTop + 8);
+    ctx.lineTo(tw - 2 + armSwing * 0.4, bodyTop + 8 + 16);
+    ctx.stroke();
+
+    // head / mask
+    const headY = bodyTop - 2;
+    ctx.fillStyle = '#0c0c14';
+    ctx.beginPath();
+    ctx.arc(tw / 2, headY, 13, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#e0223a';
+    ctx.beginPath();
+    ctx.arc(tw / 2, headY, 13, Math.PI * 1.15, Math.PI * 1.95);
+    ctx.fill();
+    // eyes
+    ctx.fillStyle = '#fff';
+    ctx.beginPath();
+    ctx.moveTo(tw / 2 - 8, headY - 2);
+    ctx.lineTo(tw / 2 - 1, headY - 4);
+    ctx.lineTo(tw / 2 - 2, headY + 2);
+    ctx.closePath();
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(tw / 2 + 8, headY - 2);
+    ctx.lineTo(tw / 2 + 1, headY - 4);
+    ctx.lineTo(tw / 2 + 2, headY + 2);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.restore();
+  }
+
+  function drawProwler(x, groundY, runT) {
+    ctx.save();
+    ctx.translate(x, groundY);
+    const bob = Math.sin(runT + 1) * 3;
+    const h = 66;
+    const bodyTop = -h + bob;
+    const tw = 34;
+
+    const legSwing = Math.sin(runT + 1) * 11;
+    ctx.strokeStyle = '#241033';
+    ctx.lineWidth = 8;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(10, -20 + bob);
+    ctx.lineTo(10 + legSwing * 0.5, 0);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(24, -20 + bob);
+    ctx.lineTo(24 - legSwing * 0.5, 0);
+    ctx.stroke();
+
+    // cape
+    ctx.fillStyle = 'rgba(40, 10, 60, 0.85)';
+    ctx.beginPath();
+    ctx.moveTo(tw + 2, bodyTop + 4);
+    ctx.quadraticCurveTo(tw + 26 + Math.sin(runT) * 6, bodyTop + h * 0.5, tw + 6, bodyTop + h * 0.9);
+    ctx.lineTo(tw - 4, bodyTop + h * 0.3);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.fillStyle = '#5a1f8f';
+    ctx.beginPath();
+    ctx.roundRect(0, bodyTop, tw, h * 0.62, 6);
+    ctx.fill();
+
+    ctx.fillStyle = '#c9a94a';
+    ctx.beginPath();
+    ctx.roundRect(4, bodyTop + h * 0.06, tw - 8, h * 0.14, 4);
+    ctx.fill();
+
+    // arms with claws
+    ctx.strokeStyle = '#5a1f8f';
+    ctx.lineWidth = 7;
+    const armSwing = Math.cos(runT + 1) * 10;
+    ctx.beginPath();
+    ctx.moveTo(2, bodyTop + 6);
+    ctx.lineTo(2 - armSwing * 0.4, bodyTop + 22);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(tw - 2, bodyTop + 6);
+    ctx.lineTo(tw - 2 + armSwing * 0.4, bodyTop + 22);
+    ctx.stroke();
+    // claws
+    ctx.strokeStyle = '#e8e0c9';
+    ctx.lineWidth = 2.5;
+    const clawX = tw - 2 + armSwing * 0.4, clawY = bodyTop + 22;
+    for (let i = -1; i <= 1; i++) {
+      ctx.beginPath();
+      ctx.moveTo(clawX, clawY);
+      ctx.lineTo(clawX + 8, clawY + i * 5);
+      ctx.stroke();
+    }
+
+    // head / hood
+    const headY = bodyTop - 2;
+    ctx.fillStyle = '#3d1a5c';
+    ctx.beginPath();
+    ctx.arc(tw / 2, headY, 14, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#8bffb0';
+    ctx.beginPath();
+    ctx.ellipse(tw / 2 - 5, headY, 4, 2.5, 0, 0, Math.PI * 2);
+    ctx.ellipse(tw / 2 + 5, headY, 4, 2.5, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.restore();
+  }
+
+  function drawObstacle(o) {
+    ctx.save();
+    if (o.type === 'crate') {
+      ctx.translate(o.x, o.y - o.h);
+      ctx.fillStyle = '#6b4226';
+      ctx.fillRect(0, 0, o.w, o.h);
+      ctx.strokeStyle = '#3d2414';
+      ctx.lineWidth = 3;
+      ctx.strokeRect(1, 1, o.w - 2, o.h - 2);
+      ctx.beginPath();
+      ctx.moveTo(0, 0); ctx.lineTo(o.w, o.h);
+      ctx.moveTo(o.w, 0); ctx.lineTo(0, o.h);
+      ctx.stroke();
+    } else if (o.type === 'spike') {
+      ctx.translate(o.x, o.y);
+      ctx.fillStyle = '#b3b8c9';
+      const n = 3;
+      const sw = o.w / n;
+      for (let i = 0; i < n; i++) {
+        ctx.beginPath();
+        ctx.moveTo(i * sw, 0);
+        ctx.lineTo(i * sw + sw / 2, -o.h);
+        ctx.lineTo(i * sw + sw, 0);
+        ctx.closePath();
+        ctx.fill();
+      }
+    } else if (o.type === 'beam') {
+      ctx.translate(o.x, o.y);
+      ctx.fillStyle = '#8a8f9e';
+      ctx.fillRect(0, 0, o.w, o.h);
+      ctx.fillStyle = '#c0392b';
+      for (let i = 0; i < o.w; i += 16) {
+        ctx.fillRect(i, 0, 8, o.h);
+      }
+    }
+    ctx.restore();
+  }
+
+  function draw() {
+    ctx.save();
+    if (shakeT > 0) {
+      ctx.translate((Math.random() - 0.5) * shakeT, (Math.random() - 0.5) * shakeT);
+    }
+    drawBackground();
+
+    // prowler chasing distance visualized via gap
+    const prowlerX = player.x - 60 - (gap / 100) * 150;
+    drawProwler(Math.max(-40, prowlerX), GROUND_Y, player.runT * 0.9);
+
+    for (const o of obstacles) {
+      if (o.webbed) continue;
+      drawObstacle(o);
+    }
+
+    for (const wb of webBeams) {
+      ctx.strokeStyle = `rgba(200, 230, 255, ${wb.life / 14})`;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(wb.x, wb.y);
+      ctx.lineTo(wb.x + (14 - wb.life) * 20, wb.y - 10);
+      ctx.stroke();
+    }
+
+    if (invuln > 0 && Math.floor(invuln * 20) % 2 === 0) {
+      // flicker on hit
+    } else {
+      drawMiles(player.x, player.y, player.ducking, player.runT, player.grounded);
+    }
+
+    for (const p of particles) {
+      ctx.fillStyle = p.color;
+      ctx.globalAlpha = Math.max(0, p.life / 26);
+      ctx.fillRect(p.x, p.y, 4, 4);
+      ctx.globalAlpha = 1;
+    }
+
+    ctx.restore();
+  }
+
+  // ---------- Loop ----------
+  let last = performance.now();
+  function loop(now) {
+    const dt = Math.min(2, (now - last) / (1000 / 60));
+    last = now;
+    update(dt);
+    draw();
+    requestAnimationFrame(loop);
+  }
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
